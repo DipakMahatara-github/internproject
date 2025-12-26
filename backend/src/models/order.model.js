@@ -1,83 +1,83 @@
 import { pool } from '../config/db.js';
 
 export async function createOrderFromCart(userId) {
-  const connection = await pool.getConnection();
+  const client = await pool.connect();
   try {
-    await connection.beginTransaction();
+    await client.query('BEGIN');
 
-    const [cartRows] = await connection.execute('SELECT id FROM carts WHERE user_id = ?', [userId]);
-    if (cartRows.length === 0) {
+    const cartResult = await client.query('SELECT id FROM carts WHERE user_id = $1', [userId]);
+    if (cartResult.rows.length === 0) {
       throw Object.assign(new Error('Cart is empty'), { status: 400 });
     }
-    const cartId = cartRows[0].id;
+    const cartId = cartResult.rows[0].id;
 
-    const [items] = await connection.execute(
+    const itemsResult = await client.query(
       `SELECT ci.product_id, ci.quantity, p.price
        FROM cart_items ci
        JOIN products p ON ci.product_id = p.id
-       WHERE ci.cart_id = ?`,
+       WHERE ci.cart_id = $1`,
       [cartId]
     );
 
-    if (items.length === 0) {
+    if (itemsResult.rows.length === 0) {
       throw Object.assign(new Error('Cart is empty'), { status: 400 });
     }
 
-    const [orderResult] = await connection.execute(
-      'INSERT INTO orders (user_id) VALUES (?)',
+    const orderResult = await client.query(
+      'INSERT INTO orders (user_id) VALUES ($1) RETURNING id',
       [userId]
     );
-    const orderId = orderResult.insertId;
+    const orderId = orderResult.rows[0].id;
 
-    for (const item of items) {
-      await connection.execute(
-        'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
+    for (const item of itemsResult.rows) {
+      await client.query(
+        'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)',
         [orderId, item.product_id, item.quantity, item.price]
       );
     }
 
-    await connection.execute('DELETE FROM cart_items WHERE cart_id = ?', [cartId]);
+    await client.query('DELETE FROM cart_items WHERE cart_id = $1', [cartId]);
 
-    await connection.commit();
+    await client.query('COMMIT');
     return orderId;
   } catch (err) {
-    await connection.rollback();
+    await client.query('ROLLBACK');
     throw err;
   } finally {
-    connection.release();
+    client.release();
   }
 }
 
 export async function getUserOrders(userId) {
-  const [orders] = await pool.execute(
-    'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC',
+  const ordersResult = await pool.query(
+    'SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC',
     [userId]
   );
 
-  for (const order of orders) {
-    const [items] = await pool.execute(
+  for (const order of ordersResult.rows) {
+    const itemsResult = await pool.query(
       `SELECT oi.*, p.name, p.image_path
        FROM order_items oi
        JOIN products p ON oi.product_id = p.id
-       WHERE oi.order_id = ?`,
+       WHERE oi.order_id = $1`,
       [order.id]
     );
-    order.items = items;
+    order.items = itemsResult.rows;
   }
 
-  return orders;
+  return ordersResult.rows;
 }
 
 export async function getAllOrders() {
-  const [orders] = await pool.execute(
+  const result = await pool.query(
     `SELECT o.*, u.username, u.email
      FROM orders o
      JOIN users u ON o.user_id = u.id
      ORDER BY o.created_at DESC`
   );
-  return orders;
+  return result.rows;
 }
 
 export async function updateOrderStatus(orderId, status) {
-  await pool.execute('UPDATE orders SET status = ? WHERE id = ?', [status, orderId]);
+  await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [status, orderId]);
 }

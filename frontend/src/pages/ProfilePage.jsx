@@ -33,7 +33,7 @@ export default function ProfilePage() {
               </div>
               <ul className="list-disc list-inside text-gray-700">
                 {o.items?.map((it) => (
-                  <li key={it.id}>{it.quantity} x {it.name} (${it.price})</li>
+                  <li key={it.id}>{it.quantity} x {it.name} (NPR {it.price})</li>
                 ))}
               </ul>
             </div>

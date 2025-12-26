@@ -2,8 +2,14 @@ import React from 'react';
 
 export default function Footer() {
   return (
-    <footer className="border-t mt-8 py-4 text-center text-sm text-gray-500">
-      <p>Milan Wholesale Clone &copy; {new Date().getFullYear()}</p>
+    <footer className="bg-gray-800 text-white mt-12 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <p className="text-sm text-gray-300">
+            &copy; {new Date().getFullYear()} Sworaj Krishi Farm Pvt.Ltd. All rights reserved.
+          </p>
+        </div>
+      </div>
     </footer>
   );
 }

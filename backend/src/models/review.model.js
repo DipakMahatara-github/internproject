@@ -1,34 +1,34 @@
 import { pool } from '../config/db.js';
 
 export async function getReviewsByProduct(productId) {
-  const [rows] = await pool.execute(
+  const result = await pool.query(
     `SELECT r.*, u.username
      FROM reviews r
      JOIN users u ON r.user_id = u.id
-     WHERE r.product_id = ?
+     WHERE r.product_id = $1
      ORDER BY r.created_at DESC`,
     [productId]
   );
-  return rows;
+  return result.rows;
 }
 
 export async function upsertReview({ userId, productId, rating, comment }) {
-  const [existing] = await pool.execute(
-    'SELECT id FROM reviews WHERE user_id = ? AND product_id = ?',
+  const existingResult = await pool.query(
+    'SELECT id FROM reviews WHERE user_id = $1 AND product_id = $2',
     [userId, productId]
   );
 
-  if (existing.length > 0) {
-    await pool.execute(
-      'UPDATE reviews SET rating = ?, comment = ? WHERE id = ?',
-      [rating, comment, existing[0].id]
+  if (existingResult.rows.length > 0) {
+    await pool.query(
+      'UPDATE reviews SET rating = $1, comment = $2 WHERE id = $3',
+      [rating, comment, existingResult.rows[0].id]
     );
-    return existing[0].id;
+    return existingResult.rows[0].id;
   } else {
-    const [result] = await pool.execute(
-      'INSERT INTO reviews (user_id, product_id, rating, comment) VALUES (?, ?, ?, ?)',
+    const result = await pool.query(
+      'INSERT INTO reviews (user_id, product_id, rating, comment) VALUES ($1, $2, $3, $4) RETURNING id',
       [userId, productId, rating, comment]
     );
-    return result.insertId;
+    return result.rows[0].id;
   }
 }

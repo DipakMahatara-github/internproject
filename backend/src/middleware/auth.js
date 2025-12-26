@@ -22,3 +22,13 @@ export function adminMiddleware(req, res, next) {
   }
   next();
 }
+
+export function nonAdminMiddleware(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+  if (req.user.is_admin) {
+    return res.status(403).json({ message: 'This action is not available for admins' });
+  }
+  next();
+}
